@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donation Dashboard Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-color: #1f2937;
+            --border-color: #e5e7eb;
+            --highlight-bg: #eff6ff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .btn-reset {
+            display: none; 
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-reset:hover { background-color: #1d4ed8; }
+
+        /* KPI Cards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-title { font-size: 13px; color: #6b7280; text-transform: uppercase; margin-bottom: 5px; }
+        .metric-value { font-size: 28px; font-weight: bold; color: var(--primary-color); }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 65% 34%;
+            gap: 1%;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .dashboard-grid { grid-template-columns: 1fr; gap: 20px; }
+        }
+
+        /* Chart Area */
+        .chart-container {
+            position: relative;
+            height: 500px;
+            width: 100%;
+        }
+
+        /* RIGHT PANEL STYLING */
+        
+        /* 1. The Featured Latest Donation Card */
+        .latest-donation-card {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .latest-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .latest-amount { font-size: 32px; font-weight: 700; margin: 5px 0; }
+        .latest-donor { font-size: 16px; font-weight: 500; }
+        .latest-date { font-size: 13px; opacity: 0.9; }
+
+        /* 2. The Scrollable Table Container */
+        .table-wrapper {
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            height: 350px; /* Fixed height for scroll */
+            overflow-y: auto;
+            position: relative;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        th {
+            background-color: #f8fafc;
+            position: sticky; /* Keeps header fixed */
+            top: 0;
+            z-index: 10;
+            font-size: 13px;
+            text-align: left;
+            padding: 12px 15px;
+            border-bottom: 2px solid var(--border-color);
+            cursor: pointer; /* Indicates sortable */
+            user-select: none;
+        }
+        
+        th:hover { background-color: #e2e8f0; }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            color: #4b5563;
+        }
+
+        tr:hover { background-color: #f9fafb; }
+        
+        .amount-cell { font-weight: 600; color: var(--primary-color); text-align: right; }
+        
+        /* Sort Arrows */
+        .sort-icon::after { content: ' ↕'; font-size: 10px; color: #999; }
+        .asc::after { content: ' ↑'; color: #333; }
+        .desc::after { content: ' ↓'; color: #333; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-row">
+        <div>
+            <h1>NGO India Tracker</h1>
+            <p style="color: #6b7280; margin: 0;">Financial Overview</p>
+        </div>
+        <button id="resetBtn" class="btn-reset" onclick="resetDashboard()">← Back to Overview</button>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="card">
+            <div class="metric-title">Total Received</div>
+            <div class="metric-value" id="total-amount">₹0.00</div>
+        </div>
+        <div class="card">
+            <div class="metric-title">Total Donors</div>
+            <div class="metric-value" id="total-donors">0</div>
+        </div>
+        <div class="card">
+            <div class="metric-title">Avg. Donation</div>
+            <div class="metric-value" id="avg-donation">₹0.00</div>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        
+        <div class="card">
+            <h3 style="margin-top:0;">Donation Trends</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Click a bar to view donor details</p>
+            <div class="chart-container">
+                <canvas id="mainChart"></canvas>
+            </div>
+        </div>
+
+        <div id="side-panel">
+            
+            <div class="latest-donation-card" id="latest-card">
+                <div class="latest-label">Most Recent Donation</div>
+                <div class="latest-amount" id="feat-amount">₹0</div>
+                <div class="latest-donor" id="feat-name">No Data</div>
+                <div class="latest-date" id="feat-date">--</div>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="donationTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('date')" class="sort-icon" id="header-date">Date</th>
+                            <th onclick="sortTable('name')" class="sort-icon" id="header-name">Donor</th>
+                            <th onclick="sortTable('amount')" class="sort-icon" id="header-amount" style="text-align: right;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // --- 1. Data Setup ---
+    const donorNames = ["Rahul Sharma", "Priya Patel", "Amit Kumar", "Sneha Gupta", "Mohammed Khan", "Anjali Singh", "Vikram Reddy", "Rohan Das", "Kavita Krishnan", "Arjun Singh", "Deepa Malik", "Suresh Raina"];
+    const formatINR = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
+
+    // Database: Keys = Month, Value = Array of donations
+    const database = { 'July': [], 'August': [], 'September': [], 'October': [], 'November': [], 'December': [] };
+
+    // Generate Random Data
+    Object.keys(database).forEach((month, index) => {
+        const count = Math.floor(Math.random() * 8) + 5; 
+        for(let i=0; i<count; i++) {
+            // Create a real Date object for sorting logic
+            const day = Math.floor(Math.random() * 28) + 1;
+            const monthIndex = index + 6; // July is 6 (0-indexed)
+            const dateObj = new Date(2023, monthIndex, day);
+            
+            database[month].push({
+                dateObj: dateObj,
+                displayDate: dateObj.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+                name: donorNames[Math.floor(Math.random() * donorNames.length)],
+                amount: Math.floor(Math.random() * 9000) + 500
+            });
+        }
+        // Initial Sort by Date (Descending)
+        database[month].sort((a, b) => b.dateObj - a.dateObj);
+    });
+
+    let allTransactions = Object.values(database).flat().sort((a, b) => b.dateObj - a.dateObj);
+
+    // --- 2. State Management ---
+    let currentData = [...allTransactions]; // Data currently in the table
+    let isDrilledDown = false;
+    let myChart = null;
+    let sortDirection = { date: 'desc', amount: 'desc', name: 'asc' }; // Track sort state
+
+    // --- 3. UI Update Functions ---
+
+    // Top KPI Cards
+    function updateKPIs(data) {
+        const total = data.reduce((sum, item) => sum + item.amount, 0);
+        document.getElementById('total-amount').innerText = formatINR(total);
+        document.getElementById('total-donors').innerText = data.length;
+        document.getElementById('avg-donation').innerText = data.length ? formatINR(total / data.length) : '₹0';
+    }
+
+    // Side Panel (Latest Card + Table)
+    function updateSidePanel(data) {
+        if(data.length === 0) return;
+
+        // 1. Update Featured Card (The very first item in the sorted list)
+        // We always want the "Most Recent" to be actual most recent, regardless of table sort? 
+        // Or should it follow the sort? usually "Most Recent" implies time.
+        // Let's find the absolute latest by date from the current dataset for the Card.
+        const latest = [...data].sort((a,b) => b.dateObj - a.dateObj)[0];
+        
+        document.getElementById('feat-amount').innerText = formatINR(latest.amount);
+        document.getElementById('feat-name').innerText = latest.name;
+        document.getElementById('feat-date').innerText = latest.displayDate + ", 2023";
+
+        // 2. Update Table Body (The rest of the data, or all of it)
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = ""; 
+
+        // We show ALL items in table, or maybe skip the first one? 
+        // Users usually prefer seeing the full list even if the top one is featured.
+        data.forEach(t => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${t.displayDate}</td>
+                <td>${t.name}</td>
+                <td class="amount-cell">${formatINR(t.amount)}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Sorting Logic
+    function sortTable(column) {
+        // Toggle direction
+        sortDirection[column] = sortDirection[column] === 'asc' ? 'desc' : 'asc';
+        
+        // Update Icons visually
+        document.querySelectorAll('.sort-icon').forEach(th => th.classList.remove('asc', 'desc'));
+        document.getElementById(`header-${column}`).classList.add(sortDirection[column]);
+
+        // Do the sort
+        currentData.sort((a, b) => {
+            let valA, valB;
+            if (column === 'amount') {
+                valA = a.amount; valB = b.amount;
+            } else if (column === 'date') {
+                valA = a.dateObj; valB = b.dateObj;
+            } else {
+                valA = a.name; valB = b.name;
+            }
+
+            if (valA < valB) return sortDirection[column] === 'asc' ? -1 : 1;
+            if (valA > valB) return sortDirection[column] === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        updateSidePanel(currentData);
+    }
+
+    // --- 4. Chart Logic ---
+    function renderChart(type, labels, dataPrimary, dataSecondary, customTooltips = null) {
+        const ctx = document.getElementById('mainChart').getContext('2d');
+        if(myChart) myChart.destroy();
+
+        const config = {
+            type: type,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: isDrilledDown ? 'Daily Amount' : 'Monthly Amount',
+                    data: dataPrimary,
+                    backgroundColor: isDrilledDown ? '#3b82f6' : 'rgba(59, 130, 246, 0.7)',
+                    borderColor: '#2563eb',
+                    borderWidth: 1,
+                    tension: 0.3,
+                    fill: isDrilledDown
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                onClick: (e, elements) => {
+                    if (elements.length > 0 && !isDrilledDown) {
+                        const index = elements[0].index;
+                        drillDown(labels[index]);
+                    }
+                },
+                scales: { y: { beginAtZero: true, ticks: { callback: (val) => '₹' + val } } },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.parsed.y;
+                                if (!isDrilledDown) {
+                                    return [` Total: ${formatINR(val)}`, ` Donors: ${dataSecondary[context.dataIndex]}`];
+                                } else {
+                                    return [` Donation: ${formatINR(val)}`, ` Donor: ${customTooltips[context.dataIndex]}`];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+        myChart = new Chart(ctx, config);
+    }
+
+    // --- 5. Main Control Functions ---
+
+    function initDashboard() {
+        // Reset Data
+        currentData = [...allTransactions];
+        updateKPIs(allTransactions);
+        
+        // Reset Chart Data
+        const labels = Object.keys(database);
+        const amounts = labels.map(m => database[m].reduce((sum, item) => sum + item.amount, 0));
+        const counts = labels.map(m => database[m].length);
+
+        renderChart('bar', labels, amounts, counts);
+        
+        // Reset Side Panel
+        updateSidePanel(currentData);
+    }
+
+    function drillDown(month) {
+        isDrilledDown = true;
+        document.getElementById('resetBtn').style.display = 'block';
+
+        // Filter data for just this month
+        const monthData = database[month];
+        currentData = [...monthData]; // Update global current data for sorting
+
+        // Update Chart
+        const labels = monthData.map(d => d.displayDate);
+        const amounts = monthData.map(d => d.amount);
+        const names = monthData.map(d => d.name);
+        renderChart('line', labels, amounts, null, names);
+        
+        // Update Side Panel
+        updateSidePanel(monthData);
+        updateKPIs(monthData); // Optional: Update Top Cards to reflect just this month? Let's do it.
+    }
+
+    function resetDashboard() {
+        isDrilledDown = false;
+        document.getElementById('resetBtn').style.display = 'none';
+        initDashboard();
+    }
+
+    // Initialize
+    initDashboard();
+
+</script>
+
+</body>
+</html>
